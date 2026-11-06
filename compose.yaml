@@ -9,6 +9,9 @@ services:
       PORT: "8080"
       DB_PATH: "/data/events.db"
       BRFU_ALLOW_SEND: "false"
+      REPLY_ENABLED: "${REPLY_ENABLED:-false}"
+      ALLOWED_TEST_SENDERS: "${ALLOWED_TEST_SENDERS:-}"
+      REPLY_FIXTURES: "${REPLY_FIXTURES:-25}"
     ports:
       - "127.0.0.1:8088:8080"
     volumes:
