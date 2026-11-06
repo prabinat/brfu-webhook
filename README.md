@@ -89,3 +89,17 @@ Returns an empty `<Response></Response>` by default, avoiding automatic outbound
 ```bash
 docker compose run --rm --no-deps app python -m unittest discover -s tests -v
 ```
+
+## Optional allowlisted WhatsApp auto-reply
+
+By default the receiver returns empty TwiML. To enable a test-only acknowledgement, set the following in the private .env:
+
+    REPLY_ENABLED=true
+    ALLOWED_TEST_SENDERS=whatsapp:+YOUR_OWN_TEST_PHONE
+    REPLY_FIXTURES=25
+
+Use the exact inbound From number including whatsapp: and country code. Recreate with docker compose up -d --build --force-recreate. Send a fresh YES FX#25, NO FX#25 or MAYBE FX#25 from the allowlisted number. Twilio will respond with:
+
+    BRFU UAT TEST ONLY: YES received for test fixture 25. No live BRFU records were changed.
+
+This TwiML response causes Twilio to send a message and can incur usage charges. No reply is generated for unrecognized commands, unlisted fixtures, non-allowlisted numbers or duplicate Message SIDs. Set REPLY_ENABLED=false and recreate the container to turn it off. The application never connects to or changes live BRFU records.
