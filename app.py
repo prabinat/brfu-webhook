@@ -18,6 +18,10 @@ AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 DB_PATH = os.getenv("DB_PATH", "/data/events.db")
 MAX_BYTES = 8192
+REPLY_ENABLED = os.getenv("REPLY_ENABLED", "false").lower() == "true"
+ALLOWED_TEST_SENDERS = set(filter(None, (s.strip() for s in os.getenv("ALLOWED_TEST_SENDERS", "").split(","))))
+REPLY_FIXTURES = set(filter(None, (s.strip() for s in os.getenv("REPLY_FIXTURES", "25").split(","))))
+
 PATHS = {"/api/webhooks/twilio/whatsapp", "/api/match-day-ops/rsvp/webhook"}
 LOCK = threading.Lock()
 SID_RE = re.compile(r"^(SM|MM)[a-fA-F0-9]{32}$")
@@ -47,6 +51,18 @@ def validate_twilio_signature(public_url, fields, signature, auth_token):
     import base64
     expected = base64.b64encode(digest).decode("ascii")
     return hmac.compare_digest(signature, expected)
+
+def make_test_reply(fields, result):
+    """Generate a reply only for an explicitly permitted test sender/fixture."""
+    if not REPLY_ENABLED or result != "recorded":
+        return None
+    if fields.get("From", "") not in ALLOWED_TEST_SENDERS:
+        return None
+    match = FIXTURE_RE.fullmatch(fields.get("Body", "").strip())
+    if not match or match.group(2) not in REPLY_FIXTURES:
+        return None
+    command, fixture = match.group(1).upper(), match.group(2)
+    return f"BRFU UAT TEST ONLY: {command} received for test fixture {fixture}. No live BRFU records were changed."
 
 def process(fields):
     sid = fields.get("MessageSid", "")
@@ -158,8 +174,14 @@ class Handler(BaseHTTPRequestHandler):
         if result == "invalid":
             self.json(400, {"error":"invalid MessageSid"})
             return
-        # Empty TwiML means ACK without generating an outbound message/cost.
-        self.reply(200, '<?xml version="1.0" encoding="UTF-8"?><Response></Response>', "text/xml")
+        # Optional TwiML reply from Twilio only for approved test senders.
+        reply_text = make_test_reply(fields, result)
+        if reply_text:
+            twiml = ('<?xml version="1.0" encoding="UTF-8"?><Response><Message>'
+                     + escape(reply_text) + '</Message></Response>')
+        else:
+            twiml = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
+        self.reply(200, twiml, "text/xml")
 
 if __name__ == "__main__":
     if not BASE_URL.startswith("https://") or not AUTH_TOKEN or len(ADMIN_TOKEN) < 24:
