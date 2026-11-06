@@ -1,0 +1,25 @@
+services:
+  app:
+    build: .
+    container_name: brfu-webhook
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PORT: "8080"
+      DB_PATH: "/data/events.db"
+      BRFU_ALLOW_SEND: "false"
+    ports:
+      - "127.0.0.1:8088:8080"
+    volumes:
+      - brfu-webhook-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  brfu-webhook-data:
