@@ -19,6 +19,23 @@ class WebhookTests(unittest.TestCase):
         self.assertFalse(app.validate_twilio_signature(url, {**fields, "Body":"NO FX#25"}, sig, "test-token"))
         self.assertFalse(app.validate_twilio_signature(url, fields, sig, "wrong-token"))
 
+    def test_reply_safety(self):
+        previous = (app.REPLY_ENABLED, app.ALLOWED_TEST_SENDERS, app.REPLY_FIXTURES)
+        fields = {"From":"whatsapp:+14415550199","Body":"YES FX#25"}
+        try:
+            app.REPLY_ENABLED = False
+            app.ALLOWED_TEST_SENDERS = {"whatsapp:+14415550199"}
+            app.REPLY_FIXTURES = {"25"}
+            self.assertIsNone(app.make_test_reply(fields, "recorded"))
+            app.REPLY_ENABLED = True
+            self.assertIn("No live BRFU records", app.make_test_reply(fields, "recorded"))
+            self.assertIsNone(app.make_test_reply(fields, "duplicate"))
+            self.assertIsNone(app.make_test_reply({**fields,"From":"whatsapp:+14415550000"}, "recorded"))
+            self.assertIsNone(app.make_test_reply({**fields,"Body":"YES FX#26"}, "recorded"))
+            self.assertIsNone(app.make_test_reply({**fields,"Body":"hello"}, "recorded"))
+        finally:
+            app.REPLY_ENABLED, app.ALLOWED_TEST_SENDERS, app.REPLY_FIXTURES = previous
+
     def test_masking(self):
         self.assertEqual(app.mask_address("whatsapp:+14415550199"), "whatsapp:***0199")
 
